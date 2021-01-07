@@ -1036,6 +1036,6 @@ func copyAndPaste(from fromPath: String, to toPath: String) -> Bool {
         return fullPath;
     }else{
         print("failed while saving \(fullPath)")
-        throw "Failed save error"
+        throw "Failed save error" //
     }
 }
