@@ -24,8 +24,7 @@ class TinyDB{
     }
     
     
-    // Getters
-
+    //========== Getters ============
     
     func getInt(_ key: String) -> Int {
         return nsd.integer(forKey: key);
@@ -53,7 +52,6 @@ class TinyDB{
         let jsonData = jsonString.data(using: .utf8)!
         // Decode
         let jsonDecoder = JSONDecoder();
-//        let dog = try jsonDecoder.decode(obj.self, from: jsonData);
         
         do {
             let object = try jsonDecoder.decode(T.self, from: jsonData);
@@ -63,8 +61,6 @@ class TinyDB{
             return typeWrapper.object;
         }
     }
-    
-    
     
     
     // Putters
@@ -86,7 +82,7 @@ class TinyDB{
     }
     func putObject<T : Encodable>(_ key: String, _ value: T){
         //https://stackoverflow.com/a/44551842/1463931
-        // https://stackoverflow.com/a/45053226/1463931
+        //https://stackoverflow.com/a/45053226/1463931
         let jsonEncoder = JSONEncoder();
         let jsonData = try! jsonEncoder.encode(value );
         let jsonString: String! = String(data: jsonData, encoding: String.Encoding.utf8)
@@ -125,7 +121,7 @@ class TinyDB{
     
 
    
-    // put Lists
+    // get Lists
     func getListInt(_ key: String) -> [Int] {
         let value = nsd.object(forKey: key);
         if value != nil {
@@ -175,7 +171,7 @@ class TinyDB{
     }
    
     func getListObject<T: Codable>(_ key: String, _ objType: T.Type) -> [T]{
-        var jsonStrings: [String] = getListString(key);
+        let jsonStrings: [String] = getListString(key);
         var objects: [T] = [];
         
         for jString in jsonStrings {
@@ -196,55 +192,60 @@ class TinyDB{
         return objects;
     }
     
-    
+    /**
+     This method saves an image (UIImage) and returns the path adress to where it is stored. Example:
+     ``` var imagePath : String = putImage(uiImage, "DropBox/Images", "profilePic.png");  ```
+
+
+    */
+
     func putImage(_ uiImage: UIImage, _ folder: String, _ imageName: String) -> String {
-        // with hope that the folder path will be like.. "DropBox/Images" (could also have more nested folders)
+        // the folder path will be like.. "DropBox/Images" (could also have more nested folders)
         // and imageName is expected to be lik.. profilePic.png
-//        var fullPath = folder + "/" + imageName;
-        var fullPath = AppFolder.Documents.url.path + "/" + folder + "/" + imageName;
+        let fullPath = AppFolder.Documents.url.path + "/" + folder + "/" + imageName;
         
        
         return putImageWithFullPath(uiImage, fullPath);
     }
     func putImageWithFullPath(_ uiImage: UIImage, _ path: String) -> String {
-//        var data: Data! = uiImage.pngData();
-//        var folder: Folder;
-//        folder = try! Folder(path: AppFolder.Documents.url.path);
-//        folder = try! folder.createSubfolderIfNeeded(at: "GenesisFiles");
-//        var file: File = try! folder.createFile(named: "image1.png", contents: data);
-//        return file.path;
-        var choppedPath = path.replacingOccurrences(of: AppFolder.Documents.url.path, with: "")
+
+        let choppedPath = path.replacingOccurrences(of: AppFolder.Documents.url.path, with: "")
         // i am removing this "documensts" part of the passed in path because I want to use that string to instantiate the Folder object that ill eventually use to create the file i am writing to. So basicaly, I cant have the path twice.
         
         // to do: delete old file if it exists
-        var data: Data! = uiImage.pngData();
+        let data: Data! = uiImage.pngData();
         var folder: Folder;
         folder = try! Folder(path: AppFolder.Documents.url.path);
-        var file: File = try! folder.createFile(at: choppedPath, contents: data)
+        let file: File = try! folder.createFile(at: choppedPath, contents: data)
         return file.path;
     }
-    
-    
+ 
+
     
     func setupFile(_ folderS: String, _ imageName: String) -> String {
-        var fullFolderPath = AppFolder.Documents.url.path + "/" + folderS;
         var folder: Folder;
-//        folder = try! Folder(path: fullFolderPath);
         folder = try! Folder(path: AppFolder.Documents.url.path).createSubfolderIfNeeded(at: folderS)
-        var file: File = try! folder.createFile(at: imageName);
-//        putString("folderPath", file.path);
+        let file: File = try! folder.createFile(at: imageName);
         return file.path;
     }
     func getImage(_ imagePath: String) -> UIImage {
-        var file: File = try! File.init(path: imagePath);
+        let file: File = try! File.init(path: imagePath);
         let imageData: Data = try! file.read();
         return UIImage(data: imageData)!;
     }
     
     func deleteImage(_ path: String){
-        var file: File = try! File.init(path: path)
+        let file: File = try! File.init(path: path)
         try! file.delete();
-
+        
+    }
+    func objectExists(_ key:String) -> Bool{
+        let gottenString = getString(key);
+        if gottenString.isEmpty{
+            return false;
+        }else{
+             return true;
+        }
         
     }
     
@@ -252,4 +253,20 @@ class TinyDB{
         nsd.removeObject(forKey: key);
     }
     
+    
+}
+
+
+/// Use to wrap primitive Codable
+// snippet from https://github.com/onmyway133/EasyStash/blob/master/Sources/Utils.swift#L35
+public struct TypeWrapper<T: Codable>: Codable {
+    enum CodingKeys: String, CodingKey {
+        case object
+    }
+
+    public let object: T
+
+    public init(object: T) {
+        self.object = object
+    }
 }
