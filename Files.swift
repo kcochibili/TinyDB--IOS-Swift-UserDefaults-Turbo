@@ -23,7 +23,6 @@
  */
 
 import Foundation
-import AppFolder;
 
 // MARK: - Locations
 
@@ -39,7 +38,7 @@ public enum LocationKind {
 public protocol Location: Equatable, CustomStringConvertible {
     /// The kind of location that is being represented (see `LocationKind`).
     static var kind: LocationKind { get }
-    /// The underlying storage for the item at the represeninted location.
+    /// The underlying storage for the item at the represented location.
     /// You don't interact with this object as part of the public API.
     var storage: Storage<Self> { get }
     /// Initialize an instance of this location with its underlying storage.
@@ -75,7 +74,9 @@ public extension Location {
 
     /// The name of the location, excluding its `extension`.
     var nameExcludingExtension: String {
-        return name.split(separator: ".").dropLast().joined()
+        let components = name.split(separator: ".")
+        guard components.count > 1 else { return name }
+        return components.dropLast().joined()
     }
 
     /// The file extension of the item at the location.
@@ -173,7 +174,6 @@ public extension Location {
         try storage.copy(to: path)
         return try Self(path: path)
     }
-    
 
     /// Delete this location. It will be permanently deleted. Use with caution.
     /// - throws: `LocationError` if the item couldn't be deleted.
@@ -322,6 +322,7 @@ private extension Storage where LocationType == Folder {
                 atPath: folderPath,
                 withIntermediateDirectories: true
             )
+
             let storage = try Storage(path: folderPath, fileManager: fileManager)
             return Folder(storage: storage)
         } catch {
@@ -456,7 +457,7 @@ public extension File {
     }
 }
 
-#if canImport(AppKit)
+#if canImport(AppKit) && !targetEnvironment(macCatalyst)
 
 import AppKit
 
@@ -874,27 +875,59 @@ public extension Folder {
         folders.includeHidden = includeHidden
         try folders.delete()
     }
+    
+    func isEmpty(includingHidden includeHidden: Bool = false) -> Bool {
+        var files = self.files
+        files.includeHidden = includeHidden
+        
+        if files.first != nil {
+            return false
+        }
+
+        var folders = subfolders
+        folders.includeHidden = includeHidden
+        return folders.first == nil
+    }
 }
 
-//#if os(macOS)
+#if os(iOS) || os(tvOS) || os(macOS)
 public extension Folder {
+    /// Resolve a folder that matches a search path within a given domain.
+    /// - parameter searchPath: The directory path to search for.
+    /// - parameter domain: The domain to search in.
+    /// - parameter fileManager: Which file manager to search using.
+    /// - throws: `LocationError` if no folder could be resolved.
+    static func matching(
+        _ searchPath: FileManager.SearchPathDirectory,
+        in domain: FileManager.SearchPathDomainMask = .userDomainMask,
+        resolvedBy fileManager: FileManager = .default
+    ) throws -> Folder {
+        let urls = fileManager.urls(for: searchPath, in: domain)
+
+        guard let match = urls.first else {
+            throw LocationError(
+                path: "",
+                reason: .unresolvedSearchPath(searchPath, domain: domain)
+            )
+        }
+
+        return try Folder(storage: Storage(
+            path: match.relativePath,
+            fileManager: fileManager
+        ))
+    }
+
     /// The current user's Documents folder
     static var documents: Folder? {
-        let urls = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)
-        guard let url = urls.first else { return nil }
-        return try? Folder(path: url.relativePath)
+        return try? .matching(.documentDirectory)
     }
 
     /// The current user's Library folder
     static var library: Folder? {
-        let urls = FileManager.default.urls(for: .libraryDirectory, in: .userDomainMask)
-        guard let url = urls.first else { return nil }
-        return try? Folder(path: url.relativePath)
+        return try? .matching(.libraryDirectory)
     }
 }
-//#endif
-
-
+#endif
 
 // MARK: - Errors
 
@@ -917,7 +950,7 @@ public struct FilesError<Reason>: Error {
 extension FilesError: CustomStringConvertible {
     public var description: String {
         return """
-        Files encounted an error at '\(path)'.
+        Files encountered an error at '\(path)'.
         Reason: \(reason)
         """
     }
@@ -939,6 +972,11 @@ public enum LocationErrorReason {
     case copyFailed(Error)
     /// A delete operation failed with an underlying system error.
     case deleteFailed(Error)
+    /// A search path couldn't be resolved within a given domain.
+    case unresolvedSearchPath(
+        FileManager.SearchPathDirectory,
+        domain: FileManager.SearchPathDomainMask
+    )
 }
 
 /// Enum listing reasons that a write operation could fail.
@@ -1003,39 +1041,5 @@ private extension String {
     func appendingSuffixIfNeeded(_ suffix: String) -> String {
         guard !hasSuffix(suffix) else { return self }
         return appending(suffix)
-    }
-}
-
-func copyAndPaste(from fromPath: String, to toPath: String) -> Bool {
-    do {
-        if FileManager.default.fileExists(atPath: toPath) {
-            try FileManager.default.removeItem(atPath: toPath);
-        }
-        try FileManager.default.copyItem(atPath: fromPath, toPath: toPath);
-    } catch (let error) {
-        print("Cannot copy item at \(fromPath) to \(toPath): \(error)");
-        return false
-    }
-    return true
-}
-
-
-    func putFile(_ content: Data?, _ folder: String, _ fileName: String) -> String {
-        // with hope that the folder path will be like.. "DropBox/Images" (could also have more nested folders)
-        // and imageName is expected to be lik.. profilePic.png
-//        var fullPath = folder + "/" + imageName;
-        var fullPath = AppFolder.Documents.url.path + "/" + folder + "/" + fileName;
-        
-       
-        return try! putFile(fullPath, content: content);
-    }
-
- func putFile(_ fullPath: String, content: Data?) throws -> String{
-    var success = FileManager.default.createFile(atPath: fullPath, contents: content, attributes: nil);
-    if(success){
-        return fullPath;
-    }else{
-        print("failed while saving \(fullPath)")
-        throw "Failed save error" //
     }
 }
