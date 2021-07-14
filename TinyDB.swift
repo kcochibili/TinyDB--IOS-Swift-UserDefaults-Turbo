@@ -8,7 +8,6 @@
 
 import Foundation
 import UIKit;
-import EasyStash;
 import AppFolder;
 
 class TinyDB{
