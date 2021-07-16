@@ -234,6 +234,20 @@ class TinyDB{
         return UIImage(data: imageData)!;
     }
     
+    func imageExists(_ imagePath: String) -> Bool {
+        var exists: Bool!;
+        do {
+            try File.init(path: imagePath);
+            exists = true;
+        } catch is LocationError {
+            exists = false
+        } catch {
+            exists = false
+        }
+        return exists
+    }
+    
+    
     func deleteImage(_ path: String){
         let file: File = try! File.init(path: path)
         try! file.delete();
